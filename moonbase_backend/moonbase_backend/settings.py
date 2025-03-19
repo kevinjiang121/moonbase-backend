@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'apps.auth.apps.AuthConfig',
     'apps.users',
     'apps.channels',
+    'apps.chats',
     "corsheaders",
 ]
 
@@ -80,7 +81,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "moonbase_backend.wsgi.application"
-
+ASGI_APPLICATION = "moonbase_backend.asgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
