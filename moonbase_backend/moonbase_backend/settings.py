@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     'apps.auth.apps.AuthConfig',
     'apps.users',
+    'apps.channels',
     "corsheaders",
 ]
 
