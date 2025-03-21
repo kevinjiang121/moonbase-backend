@@ -9,19 +9,20 @@ class SignupTests(APITestCase):
     def test_signup_success(self):
         url = reverse('signup')
         data = {
-            "username": "testuser",
-            "email": "testuser@example.com",
-            "password": "password123"
+            "username": "test",
+            "email": "test@gmail.com",
+            "password": "test"
         }
         response = self.client.post(url, data, format='json')
-        user = User.objects.get(username="testuser")
+        user = User.objects.get(username="test")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(user.email, "testuser@example.com")
-        self.assertTrue(check_password("password123", user.password_hash))
-        self.assertEqual(response.data.get("username"), "testuser")
-        self.assertEqual(response.data.get("email"), "testuser@example.com")
+        self.assertEqual(user.email, "test@gmail.com")
+        self.assertTrue(check_password("test", user.password))
+        self.assertEqual(response.data.get("username"), "test")
+        self.assertEqual(response.data.get("email"), "test@gmail.com")
         self.assertNotIn("password", response.data)
+
 
     def test_signup_invalid_data(self):
         url = reverse('signup')
@@ -37,21 +38,21 @@ class SignupTests(APITestCase):
 class LoginTests(APITestCase):
     def setUp(self):
         self.user = User.objects.create(
-            username="testuser",
-            email="testuser@example.com",
-            password_hash=make_password("password123")
+            username="test",
+            email="test@example.com",
+            password=make_password("test")
         )
 
     def test_login_success(self):
         url = reverse('login')
         data = {
-            "username": "testuser",
-            "password": "password123"
+            "username": "test",
+            "password": "test"
         }
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("access_token", response.data)
-        self.assertEqual(response.data.get("user")["username"], "testuser")
+        self.assertEqual(response.data.get("user")["username"], "test")
 
     def test_login_invalid_credentials(self):
         url = reverse('login')

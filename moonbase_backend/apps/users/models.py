@@ -12,7 +12,7 @@ class User(models.Model):
     username = models.CharField(max_length=150, unique=True)
     discriminator = models.CharField(max_length=10, blank=True, null=True)
     email = models.EmailField(unique=True)
-    password_hash = models.CharField(max_length=128)
+    password = models.CharField(max_length=128)
     avatar_url = models.URLField(blank=True, null=True)
     bio = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=30, default='offline')
@@ -22,6 +22,9 @@ class User(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     last_login = models.DateTimeField(blank=True, null=True)
 
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = ['email','password']
+
     class Meta:
         db_table = "users"
 
@@ -29,3 +32,11 @@ class User(models.Model):
         if self.discriminator:
             return f"{self.username}#{self.discriminator}"
         return self.username
+    
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False

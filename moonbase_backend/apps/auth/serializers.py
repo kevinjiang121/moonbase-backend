@@ -12,7 +12,7 @@ class SignupSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         password = validated_data.pop('password')
-        validated_data['password_hash'] = make_password(password)
+        validated_data['password'] = make_password(password)
         return User.objects.create(**validated_data)
 
 class LoginSerializer(serializers.Serializer):
@@ -28,7 +28,7 @@ class LoginSerializer(serializers.Serializer):
         except User.DoesNotExist:
             raise serializers.ValidationError("Invalid username or password.")
 
-        if not check_password(password, user.password_hash):
+        if not check_password(password, user.password):
             raise serializers.ValidationError("Invalid username or password.")
 
         data['user'] = user
