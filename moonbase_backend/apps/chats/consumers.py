@@ -24,15 +24,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def receive(self, text_data):
-        if not text_data.strip():
-            return
-
         try:
             data = json.loads(text_data)
         except json.JSONDecodeError:
             return
         
-        message = data.get('message')
+        message = data.get('message', '').strip()
+        if not message:
+            return
+
         username = data.get('username')
         await self.save_chat(message, username)
         await self.channel_layer.group_send(
@@ -43,6 +43,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'username': username,
             }
         )
+
 
     async def chat_message(self, event):
         message = event.get('message')
