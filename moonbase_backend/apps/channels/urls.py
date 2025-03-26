@@ -16,5 +16,4 @@ urlpatterns = [
     path('get-channel-group/<int:pk>/', GetChannelGroupView.as_view(), name='get-channel-group'),
     path('get-channels-list/', GetChannelsListView.as_view(), name='get-channels-list'),
     path('get-channel-groups-list/', GetChannelGroupsListView.as_view(), name='get-channel-groups-list'),
-
 ]

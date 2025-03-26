@@ -38,6 +38,20 @@ class ChannelGroupAPITestCase(APITestCase):
         response = self.client.delete(url, format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_get_channel_group_detail_success(self):
+        group = ChannelGroup.objects.create(name="Test Group", description="Test group detail")
+        url = reverse('get-channel-group', kwargs={'pk': group.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get('name'), group.name)
+        self.assertEqual(response.data.get('description'), group.description)
+    
+    def test_get_channel_group_detail_failure(self):
+        url = reverse('get-channel-group', kwargs={'pk': 9999})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
 class ChannelAPITestCase(APITestCase):
     def setUp(self):
         self.group = ChannelGroup.objects.create(name="Category X", description="Some category")
@@ -84,4 +98,22 @@ class ChannelAPITestCase(APITestCase):
     def test_delete_channel_invalid(self):
         url = reverse('delete-channel', kwargs={'pk': 9999})
         response = self.client.delete(url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+    
+    def test_get_channel_detail_success(self):
+        channel = Channel.objects.create(
+            name="Test Channel",
+            description="Test channel detail",
+            channel_type="text",
+            group=self.group
+        )
+        url = reverse('get-channel', kwargs={'pk': channel.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get('name'), channel.name)
+        self.assertEqual(response.data.get('description'), channel.description)
+    
+    def test_get_channel_detail_failure(self):
+        url = reverse('get-channel', kwargs={'pk': 9999})
+        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
