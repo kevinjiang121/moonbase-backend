@@ -5,7 +5,6 @@ from channels.testing import WebsocketCommunicator
 from django.test import TransactionTestCase
 from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.auth import get_user_model
-
 from moonbase_backend.asgi import application
 from apps.chats.models import Chat
 from apps.channels.models import Channel
@@ -19,14 +18,15 @@ class ChatConsumerTests(TransactionTestCase):
     async def asyncSetUp(self):
         self.channel_obj = await sync_to_async(Channel.objects.create)(
             name="general",
-            description="General channel for testing"
+            description="General channel for testing",
+            channel_type="text"
         )
         self.user_obj = await sync_to_async(User.objects.create)(
             username="testuser",
             email="testuser@example.com",
             password=make_password("test")
         )
-        self.url = "/ws/chats/general/"
+        self.url = f"/ws/chats/{self.channel_obj.id}/"
 
     def test_connect_accepts(self):
         connected = async_to_sync(self._test_connect_accepts)()
@@ -56,19 +56,24 @@ class ChatConsumerTests(TransactionTestCase):
         communicator = WebsocketCommunicator(application, self.url)
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
-
-        payload = {"message": "Hello, world!", "username": "testuser"}
+        payload = {"message": "Hello, world!", "user_id": self.user_obj.user_id}
         await communicator.send_json_to(payload)
         response = await communicator.receive_json_from()
-        self.assertEqual(response, payload)
+        expected = {
+            "message": "Hello, world!",
+            "username": self.user_obj.username,
+            "sent_at": response.get("sent_at")
+        }
+        self.assertEqual(response, expected)
 
         await asyncio.sleep(0.1)
         chat_obj = await sync_to_async(Chat.objects.filter(content="Hello, world!").first)()
         self.assertIsNotNone(chat_obj)
-        author_username = await sync_to_async(lambda: chat_obj.author.username)()
+        author_username = await sync_to_async(lambda: User.objects.get(pk=chat_obj.author.pk).username)()
         self.assertEqual(author_username, "testuser")
-        channel_name = await sync_to_async(lambda: chat_obj.channel.name)()
+        channel_name = await sync_to_async(lambda: Channel.objects.get(pk=chat_obj.channel.pk).name)()
         self.assertEqual(channel_name.lower(), "general")
+        self.assertEqual(chat_obj.username, "testuser")
         await communicator.disconnect()
 
     def test_send_invalid_json(self):
@@ -83,20 +88,22 @@ class ChatConsumerTests(TransactionTestCase):
             await communicator.receive_json_from(timeout=1)
         await communicator.disconnect()
 
-    def test_send_message_missing_username(self):
-        async_to_sync(self._test_send_message_missing_username)()
+    def test_send_message_missing_user_id(self):
+        async_to_sync(self._test_send_message_missing_user_id)()
 
-    async def _test_send_message_missing_username(self):
+    async def _test_send_message_missing_user_id(self):
         communicator = WebsocketCommunicator(application, self.url)
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
-        payload = {"message": "Message without username"}
+        payload = {"message": "Message without user id"}
         await communicator.send_json_to(payload)
-        response = await communicator.receive_json_from()
-        self.assertEqual(response.get("message"), "Message without username")
-        self.assertIsNone(response.get("username"))
+        try:
+            response = await communicator.receive_json_from(timeout=1)
+            self.fail(f"Expected no response, but got: {response}")
+        except asyncio.TimeoutError:
+            pass
         await asyncio.sleep(0.1)
-        chat_obj = await sync_to_async(Chat.objects.filter(content="Message without username").first)()
+        chat_obj = await sync_to_async(Chat.objects.filter(content="Message without user id").first)()
         self.assertIsNone(chat_obj)
         await communicator.disconnect()
 
@@ -108,10 +115,13 @@ class ChatConsumerTests(TransactionTestCase):
         communicator = WebsocketCommunicator(application, self.url)
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
-        payload = {"message": "Hello, no channel!", "username": "testuser"}
+        payload = {"message": "Hello, no channel!", "user_id": self.user_obj.user_id}
         await communicator.send_json_to(payload)
-        response = await communicator.receive_json_from()
-        self.assertEqual(response, payload)
+        try:
+            response = await communicator.receive_json_from(timeout=1)
+            self.fail(f"Expected no response, but got: {response}")
+        except asyncio.TimeoutError:
+            pass  # Expected
         await asyncio.sleep(0.1)
         chat_obj = await sync_to_async(Chat.objects.filter(content="Hello, no channel!").first)()
         self.assertIsNone(chat_obj)
@@ -124,10 +134,13 @@ class ChatConsumerTests(TransactionTestCase):
         communicator = WebsocketCommunicator(application, self.url)
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
-        payload = {"message": "   ", "username": "testuser"}
+        payload = {"message": "   ", "user_id": self.user_obj.user_id}
         await communicator.send_json_to(payload)
-        with self.assertRaises(asyncio.TimeoutError):
-            await communicator.receive_json_from(timeout=1)
+        try:
+            response = await communicator.receive_json_from(timeout=1)
+            self.fail(f"Expected no response for empty message, but got: {response}")
+        except asyncio.TimeoutError:
+            pass  # Expected
         await asyncio.sleep(0.1)
         chat_obj = await sync_to_async(Chat.objects.filter(content="   ").first)()
         self.assertIsNone(chat_obj)
@@ -142,13 +155,17 @@ class ChatConsumerTests(TransactionTestCase):
         self.assertTrue(connected)
         payload = {
             "message": "Extra fields test",
-            "username": "testuser",
+            "user_id": self.user_obj.user_id,
             "extra": "should be ignored",
             "another": 123
         }
         await communicator.send_json_to(payload)
         response = await communicator.receive_json_from()
-        expected = {"message": "Extra fields test", "username": "testuser"}
+        expected = {
+            "message": "Extra fields test",
+            "username": self.user_obj.username,
+            "sent_at": response.get("sent_at")
+        }
         self.assertEqual(response, expected)
         await asyncio.sleep(0.1)
         chat_obj = await sync_to_async(Chat.objects.filter(content="Extra fields test").first)()
@@ -166,6 +183,6 @@ class ChatConsumerTests(TransactionTestCase):
         async def dummy_send(text_data):
             outputs.append(json.loads(text_data))
         consumer.send = dummy_send
-        event = {"message": "Direct test", "username": "testuser"}
+        event = {"message": "Direct test", "username": "testuser", "sent_at": "2025-03-25T00:00:00"}
         await consumer.chat_message(event)
-        self.assertEqual(outputs, [{"message": "Direct test", "username": "testuser"}])
+        self.assertEqual(outputs, [{"message": "Direct test", "username": "testuser", "sent_at": "2025-03-25T00:00:00"}])
