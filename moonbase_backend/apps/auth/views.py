@@ -61,7 +61,7 @@ class ForgotPasswordView(APIView):
             return Response({"message": "If the email is registered, a reset link has been sent."},
                             status=status.HTTP_200_OK)
         token = generate_reset_token(user)
-        reset_link = f"https://moonbase.com/reset-password?token={token}"
+        reset_link = f"http://localhost:4200/reset-password?token={token}"
         return Response({"message": "Password reset link sent.", "reset_link": reset_link},
                         status=status.HTTP_200_OK)
 
