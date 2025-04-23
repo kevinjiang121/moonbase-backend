@@ -64,3 +64,39 @@ class LoginTests(APITestCase):
         
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertNotIn("access_token", response.data)
+
+class ForgotPasswordTests(APITestCase):
+    def setUp(self):
+        self.url = reverse('forgot-password')
+        self.user = User.objects.create(
+            username="testuser",
+            email="testuser@example.com",
+            password=make_password("oldpassword")
+        )
+
+    def test_missing_email(self):
+        """No email in body should return 400 with error message."""
+        response = self.client.post(self.url, {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data.get('error'), "Email is required.")
+
+    def test_unregistered_email(self):
+        """Unknown email should still return 200 but no reset_link."""
+        response = self.client.post(self.url, {'email': 'noone@nowhere.com'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data.get('message'),
+            "If the email is registered, a reset link has been sent."
+        )
+        self.assertNotIn('reset_link', response.data)
+
+    def test_registered_email(self):
+        """Known email should return 200 with a reset_link containing a token."""
+        response = self.client.post(self.url, {'email': 'testuser@example.com'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get('message'), "Password reset link sent.")
+        self.assertIn('reset_link', response.data)
+        link = response.data['reset_link']
+        self.assertTrue(link.startswith("https://moonbase.com/reset-password?token="))
+        token = link.split("token=", 1)[1]
+        self.assertTrue(len(token) > 10)
