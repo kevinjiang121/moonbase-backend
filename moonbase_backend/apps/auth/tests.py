@@ -4,6 +4,13 @@ from rest_framework.test import APITestCase
 from rest_framework import status
 from django.contrib.auth.hashers import make_password, check_password
 from apps.users.models import User
+from datetime import datetime, timedelta
+from django.core import signing
+from django.conf import settings
+from rest_framework.test import APITestCase
+
+from apps.users.models import User
+from apps.auth.views import generate_reset_token
 
 class SignupTests(APITestCase):
     def test_signup_success(self):
@@ -104,3 +111,63 @@ class ForgotPasswordTests(APITestCase):
 
         token = link.split('token=', 1)[1]
         self.assertGreater(len(token), 10)
+
+class ResetPasswordTests(APITestCase):
+    def setUp(self):
+        self.url = reverse('reset-password')
+        self.user = User.objects.create(
+            username="resetuser",
+            email="resetuser@example.com",
+            password=make_password("oldpassword")
+        )
+        self.valid_token = generate_reset_token(self.user)
+        data = {
+            'user_id': self.user.user_id,
+            'exp': (datetime.utcnow() - timedelta(hours=1)).timestamp()
+        }
+        self.expired_token = signing.dumps(data, key=settings.SECRET_KEY)
+        self.invalid_token = "not-a-valid-token"
+
+    def test_missing_token_or_password(self):
+        resp = self.client.post(self.url, {}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.data.get('error'), "Token and new password are required.")
+
+    def test_invalid_token(self):
+        resp = self.client.post(self.url, {
+            'token': self.invalid_token,
+            'new_password': 'newpass123'
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.data.get('error'), "Invalid or expired token.")
+
+    def test_expired_token(self):
+        resp = self.client.post(self.url, {
+            'token': self.expired_token,
+            'new_password': 'newpass123'
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.data.get('error'), "Invalid or expired token.")
+
+    def test_user_not_found(self):
+        data = {
+            'user_id': 99999,
+            'exp': (datetime.utcnow() + timedelta(hours=1)).timestamp()
+        }
+        token = signing.dumps(data, key=settings.SECRET_KEY)
+        resp = self.client.post(self.url, {
+            'token': token,
+            'new_password': 'newpass123'
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(resp.data.get('error'), "User not found.")
+
+    def test_successful_reset(self):
+        resp = self.client.post(self.url, {
+            'token': self.valid_token,
+            'new_password': 'BrandNewPass!1'
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data.get('message'), "Password has been reset successfully.")
+        user = User.objects.get(user_id=self.user.user_id)
+        self.assertTrue(check_password("BrandNewPass!1", user.password))
