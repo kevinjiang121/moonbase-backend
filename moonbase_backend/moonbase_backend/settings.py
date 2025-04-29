@@ -162,3 +162,5 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 EMAIL_BACKEND = 'django.core.mail.backends.filebased.EmailBackend'
 EMAIL_FILE_PATH = '/tmp/app‑mails'
+
+FRONTEND_URL_DEV = os.getenv("FRONTEND_URL_DEV", "http://localhost:4200")
