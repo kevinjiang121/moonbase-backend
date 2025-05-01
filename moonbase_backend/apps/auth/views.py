@@ -6,6 +6,7 @@ from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from django.core.mail import send_mail
 import jwt
 
 from apps.users.models import User
@@ -60,11 +61,18 @@ class ForgotPasswordView(APIView):
         except User.DoesNotExist:
             return Response({"message": "If the email is registered, a reset link has been sent."},
                             status=status.HTTP_200_OK)
+
         token = generate_reset_token(user)
         frontend = settings.FRONTEND_URL_DEV
         reset_link = f"{frontend}/reset-password?token={token}"
-        return Response({"message": "Password reset link sent.", "reset_link": reset_link},
-                        status=status.HTTP_200_OK)
+        send_mail(
+            subject="Your password reset link",
+            message=f"Click here to reset your password:\n\n{reset_link}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+        return Response({"message": "Password reset link sent."}, status=status.HTTP_200_OK)
 
 class ResetPasswordView(APIView):
     def post(self, request, *args, **kwargs):
