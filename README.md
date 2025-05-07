@@ -1,4 +1,4 @@
-# Moonbase Backend 🛰️
+# Moonbase Backend
 
 A Django 5.1 + Channels backend providing REST APIs and WebSocket support for the Moonbase chat platform.
 
